@@ -92,23 +92,26 @@ function CreateEscrow() {
       setLoading(true);
       setResult(null);
 
-      const res = await createEscrow(
+      const res = await createEscrow({
         wallet,
+      
+        escrowType: 0,
+      
         partyA,
         partyB,
-        toMist(price),
-        toMist(
-          mode === "buying"
-            ? yourBond
-            : otherBond
+      
+        referenceAmount: toMist(price),
+      
+        requiredDepositA: toMist(
+          preview.partyARequired
         ),
-        toMist(
-          mode === "buying"
-            ? otherBond
-            : yourBond
+      
+        requiredDepositB: toMist(
+          preview.partyBRequired
         ),
-        note
-      );
+      
+        note,
+      });
 
       setResult(res);
     } catch (error) {

@@ -1,0 +1,40 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# E2E secrets
+**/.env.e2e
+
+# Node
+**/node_modules/
+
+# Playwright output
+**/test-results/
+**/playwright-report/
+**/blob-report/
+
+# Frontend builds
+**/dist/
+
+# Sui / Move build output
+**/build/
+
+# Backup / temporary files
+*.backup
+*.old
+*.bak
+*~
+
+# Local test wallet extension
+sui-test-wallet/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Playwright persistent browser / wallet profiles
+**/e2e/wallet-profile/
+**/e2e/wallet-profile-localnet/
+**/e2e/wallet-profile-devnet/

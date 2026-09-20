@@ -3,14 +3,28 @@ module escrow::escrow {
     use std::option::{Self, Option};
     use std::vector;
 
+    use sui::balance::{Self, Balance};
+    use sui::clock::{Self, Clock};
     use sui::coin::{Self, Coin};
+    use sui::event;
+    use sui::object::{Self, ID, UID};
     use sui::sui::SUI;
-    use sui::object::{Self, UID};
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
 
+    // ============================================================
+    // Status
+    // ============================================================
+
     const STATUS_CREATED: u8 = 0;
-    const STATUS_FUNDED: u8 = 1;
+    const STATUS_DEPOSITS_COMPLETE: u8 = 1;
+    const STATUS_FINALIZATION_SUGGESTED: u8 = 2;
+    const STATUS_COMPLETED: u8 = 3;
+    const STATUS_CANCELLED: u8 = 4;
+
+    // ============================================================
+    // Errors
+    // ============================================================
 
     const E_INVALID_AMOUNT: u64 = 0;
     const E_NOTE_TOO_LONG: u64 = 1;
@@ -19,241 +33,653 @@ module escrow::escrow {
     const E_INVALID_STATUS: u64 = 4;
     const E_ALREADY_DEPOSITED: u64 = 5;
     const E_INVALID_DEPOSIT_AMOUNT: u64 = 6;
-    const E_NOT_FUNDED: u64 = 7;
+    const E_NOTHING_TO_WITHDRAW: u64 = 7;
+    const E_INVALID_FINALIZATION: u64 = 8;
+    const E_CANNOT_ACCEPT_OWN_FINALIZATION: u64 = 9;
+    const E_CANNOT_REJECT_OWN_FINALIZATION: u64 = 10;
+    const E_INVALID_DONATION: u64 = 11;
+    const E_ARITHMETIC_OVERFLOW: u64 = 12;
 
     const MAX_NOTE_LEN: u64 = 200;
+    const DONATION_RECIPIENT: address = @0xD;
+
+    // ============================================================
+    // Escrow
+    // ============================================================
 
     public struct Escrow has key {
         id: UID,
 
         creator: address,
 
-        buyer: address,
-        seller: address,
+        // None = open party slot.
+        party_a: Option<address>,
+        party_b: Option<address>,
 
-        price: u64,
-        buyer_bond: u64,
-        seller_bond: u64,
+        escrow_type: u8,
 
-        buyer_required: u64,
-        seller_required: u64,
+        reference_amount: u64,
 
-        buyer_coin: Option<Coin<SUI>>,
-        seller_coin: Option<Coin<SUI>>,
+        required_deposit_a: u64,
+        required_deposit_b: u64,
 
-        buyer_deposited: bool,
-        seller_deposited: bool,
+        deposited_a: u64,
+        deposited_b: u64,
+
+        // All deposited SUI is held here.
+        vault: Balance<SUI>,
+
+        proposed_payout_a: u64,
+        proposed_payout_b: u64,
+        proposed_donation: u64,
+
+        finalization_proposer: Option<address>,
+        finalization_note: vector<u8>,
 
         status: u8,
+
+        created_at: u64,
+        deposit_at: u64,
+        finalized_at: u64,
 
         note: vector<u8>,
     }
 
+    // ============================================================
+    // Events
+    // ============================================================
+
+    public struct EscrowCreated has copy, drop {
+        escrow_id: ID,
+        creator: address,
+        escrow_type: u8,
+        reference_amount: u64,
+        required_deposit_a: u64,
+        required_deposit_b: u64,
+    }
+
+    public struct Deposited has copy, drop {
+        escrow_id: ID,
+        depositor: address,
+        party: u8,
+        amount: u64,
+    }
+
+    public struct DepositsComplete has copy, drop {
+        escrow_id: ID,
+        timestamp_ms: u64,
+    }
+
+    public struct FinalizationSuggested has copy, drop {
+        escrow_id: ID,
+        proposer: address,
+        payout_a: u64,
+        payout_b: u64,
+        donation: u64,
+    }
+
+    public struct FinalizationRejected has copy, drop {
+        escrow_id: ID,
+        rejected_by: address,
+    }
+
+    public struct EscrowCompleted has copy, drop {
+        escrow_id: ID,
+        accepted_by: address,
+        payout_a: u64,
+        payout_b: u64,
+        donation: u64,
+        timestamp_ms: u64,
+    }
+
+    public struct EscrowCancelled has copy, drop {
+        escrow_id: ID,
+        withdrawn_by: address,
+        amount: u64,
+    }
+
+    // ============================================================
+    // Create
+    // ============================================================
+
     public fun create_escrow(
-        buyer: address,
-        seller: address,
-        price: u64,
-        buyer_bond: u64,
-        seller_bond: u64,
+        escrow_type: u8,
+        party_a: Option<address>,
+        party_b: Option<address>,
+        reference_amount: u64,
+        required_deposit_a: u64,
+        required_deposit_b: u64,
         note: vector<u8>,
-        ctx: &mut TxContext
+        clock: &Clock,
+        ctx: &mut TxContext,
     ) {
-        assert!(price > 0, E_INVALID_AMOUNT);
-        assert!(buyer_bond > 0, E_INVALID_AMOUNT);
-        assert!(seller_bond > 0, E_INVALID_AMOUNT);
+        assert!(reference_amount > 0, E_INVALID_AMOUNT);
+        assert!(required_deposit_a > 0, E_INVALID_AMOUNT);
+        assert!(required_deposit_b > 0, E_INVALID_AMOUNT);
         assert!(vector::length(&note) <= MAX_NOTE_LEN, E_NOTE_TOO_LONG);
-        assert!(buyer != seller, E_INVALID_PARTY);
 
         let creator = tx_context::sender(ctx);
 
-        // optional rule: only buyer or seller can create
+        // At least one party must already be known.
         assert!(
-            creator == buyer || creator == seller,
-            E_UNAUTHORIZED
+            option::is_some(&party_a) || option::is_some(&party_b),
+            E_INVALID_PARTY
         );
 
-        let buyer_required = price + buyer_bond;
-        let seller_required = seller_bond;
+        // Creator must be one of the pre-assigned parties.
+        let creator_is_a =
+            option::is_some(&party_a) &&
+            *option::borrow(&party_a) == creator;
+
+        let creator_is_b =
+            option::is_some(&party_b) &&
+            *option::borrow(&party_b) == creator;
+
+        assert!(creator_is_a || creator_is_b, E_UNAUTHORIZED);
+
+        // If both are known they must be different.
+        if (option::is_some(&party_a) && option::is_some(&party_b)) {
+            assert!(
+                *option::borrow(&party_a) != *option::borrow(&party_b),
+                E_INVALID_PARTY
+            );
+        };
 
         let escrow = Escrow {
             id: object::new(ctx),
 
             creator,
 
-            buyer,
-            seller,
+            party_a,
+            party_b,
 
-            price,
-            buyer_bond,
-            seller_bond,
+            escrow_type,
 
-            buyer_required,
-            seller_required,
+            reference_amount,
 
-            buyer_coin: option::none<Coin<SUI>>(),
-            seller_coin: option::none<Coin<SUI>>(),
+            required_deposit_a,
+            required_deposit_b,
 
-            buyer_deposited: false,
-            seller_deposited: false,
+            deposited_a: 0,
+            deposited_b: 0,
+
+            vault: balance::zero<SUI>(),
+
+            proposed_payout_a: 0,
+            proposed_payout_b: 0,
+            proposed_donation: 0,
+
+            finalization_proposer: option::none<address>(),
+            finalization_note: vector[],
 
             status: STATUS_CREATED,
+
+            created_at: clock::timestamp_ms(clock),
+            deposit_at: 0,
+            finalized_at: 0,
 
             note,
         };
 
-        // shared object so both buyer and seller can interact
+        event::emit(EscrowCreated {
+            escrow_id: object::uid_to_inner(&escrow.id),
+            creator,
+            escrow_type,
+            reference_amount,
+            required_deposit_a,
+            required_deposit_b,
+        });
+
         transfer::share_object(escrow);
     }
 
-    public fun deposit_buyer(
+    // ============================================================
+    // Deposit
+    // ============================================================
+
+    public fun deposit(
         escrow: &mut Escrow,
         coin: Coin<SUI>,
-        ctx: &TxContext
+        clock: &Clock,
+        ctx: &TxContext,
     ) {
         assert!(escrow.status == STATUS_CREATED, E_INVALID_STATUS);
-        assert!(tx_context::sender(ctx) == escrow.buyer, E_UNAUTHORIZED);
-        assert!(!escrow.buyer_deposited, E_ALREADY_DEPOSITED);
-        assert!(coin::value(&coin) == escrow.buyer_required, E_INVALID_DEPOSIT_AMOUNT);
 
-        option::fill(&mut escrow.buyer_coin, coin);
-        escrow.buyer_deposited = true;
+        let sender = tx_context::sender(ctx);
+        let amount = coin::value(&coin);
 
-        if (escrow.seller_deposited) {
-            escrow.status = STATUS_FUNDED;
+        let is_party_a: bool;
+
+        if (
+            option::is_some(&escrow.party_a) &&
+            *option::borrow(&escrow.party_a) == sender
+        ) {
+            is_party_a = true;
+        } else if (
+            option::is_some(&escrow.party_b) &&
+            *option::borrow(&escrow.party_b) == sender
+        ) {
+            is_party_a = false;
+        } else if (option::is_none(&escrow.party_a)) {
+            // Cannot claim A if already Party B.
+            if (option::is_some(&escrow.party_b)) {
+                assert!(
+                    *option::borrow(&escrow.party_b) != sender,
+                    E_INVALID_PARTY
+                );
+            };
+
+            option::fill(&mut escrow.party_a, sender);
+            is_party_a = true;
+        } else if (option::is_none(&escrow.party_b)) {
+            // Cannot claim B if already Party A.
+            if (option::is_some(&escrow.party_a)) {
+                assert!(
+                    *option::borrow(&escrow.party_a) != sender,
+                    E_INVALID_PARTY
+                );
+            };
+
+            option::fill(&mut escrow.party_b, sender);
+            is_party_a = false;
+        } else {
+            abort E_UNAUTHORIZED
+        };
+
+        if (is_party_a) {
+            assert!(escrow.deposited_a == 0, E_ALREADY_DEPOSITED);
+            assert!(
+                amount == escrow.required_deposit_a,
+                E_INVALID_DEPOSIT_AMOUNT
+            );
+
+            escrow.deposited_a = amount;
+        } else {
+            assert!(escrow.deposited_b == 0, E_ALREADY_DEPOSITED);
+            assert!(
+                amount == escrow.required_deposit_b,
+                E_INVALID_DEPOSIT_AMOUNT
+            );
+
+            escrow.deposited_b = amount;
+        };
+
+        let deposit_balance = coin::into_balance(coin);
+        balance::join(&mut escrow.vault, deposit_balance);
+
+        event::emit(Deposited {
+            escrow_id: object::uid_to_inner(&escrow.id),
+            depositor: sender,
+            party: if (is_party_a) { 0 } else { 1 },
+            amount,
+        });
+
+        if (
+            escrow.deposited_a == escrow.required_deposit_a &&
+            escrow.deposited_b == escrow.required_deposit_b
+        ) {
+            escrow.status = STATUS_DEPOSITS_COMPLETE;
+            escrow.deposit_at = clock::timestamp_ms(clock);
+
+            event::emit(DepositsComplete {
+                escrow_id: object::uid_to_inner(&escrow.id),
+                timestamp_ms: escrow.deposit_at,
+            });
         };
     }
 
-    public fun deposit_seller(
+    // ============================================================
+    // Withdraw before both deposits are complete
+    //
+    // Equivalent behavior to the Solana version:
+    // one deposited party can cancel before deposits complete.
+    // Their deposit is returned.
+    // ============================================================
+
+    public fun withdraw_before_complete(
         escrow: &mut Escrow,
-        coin: Coin<SUI>,
-        ctx: &TxContext
+        ctx: &mut TxContext,
     ) {
         assert!(escrow.status == STATUS_CREATED, E_INVALID_STATUS);
-        assert!(tx_context::sender(ctx) == escrow.seller, E_UNAUTHORIZED);
-        assert!(!escrow.seller_deposited, E_ALREADY_DEPOSITED);
-        assert!(coin::value(&coin) == escrow.seller_required, E_INVALID_DEPOSIT_AMOUNT);
 
-        option::fill(&mut escrow.seller_coin, coin);
-        escrow.seller_deposited = true;
+        let sender = tx_context::sender(ctx);
 
-        if (escrow.buyer_deposited) {
-            escrow.status = STATUS_FUNDED;
+        let amount: u64;
+
+        if (
+            option::is_some(&escrow.party_a) &&
+            *option::borrow(&escrow.party_a) == sender
+        ) {
+            assert!(escrow.deposited_a > 0, E_NOTHING_TO_WITHDRAW);
+
+            amount = escrow.deposited_a;
+            escrow.deposited_a = 0;
+        } else if (
+            option::is_some(&escrow.party_b) &&
+            *option::borrow(&escrow.party_b) == sender
+        ) {
+            assert!(escrow.deposited_b > 0, E_NOTHING_TO_WITHDRAW);
+
+            amount = escrow.deposited_b;
+            escrow.deposited_b = 0;
+        } else {
+            abort E_UNAUTHORIZED
         };
+
+        let refund_balance = balance::split(&mut escrow.vault, amount);
+        let refund_coin = coin::from_balance(refund_balance, ctx);
+
+        transfer::public_transfer(refund_coin, sender);
+
+        escrow.status = STATUS_CANCELLED;
+
+        event::emit(EscrowCancelled {
+            escrow_id: object::uid_to_inner(&escrow.id),
+            withdrawn_by: sender,
+            amount,
+        });
     }
 
-    // Buyer confirms successful purchase.
-    // Seller receives price + buyer bond.
-    // Buyer receives seller bond.
-    public fun release(
-        escrow: Escrow,
-        ctx: &mut TxContext
+    // ============================================================
+    // Suggest finalization
+    // ============================================================
+
+    public fun suggest_finalization(
+        escrow: &mut Escrow,
+        payout_a: u64,
+        payout_b: u64,
+        proposed_donation: u64,
+        finalization_note: vector<u8>,
+        ctx: &TxContext,
     ) {
-        assert!(tx_context::sender(ctx) == escrow.buyer, E_UNAUTHORIZED);
-        assert!(escrow.status == STATUS_FUNDED, E_NOT_FUNDED);
+        assert!(
+            escrow.status == STATUS_DEPOSITS_COMPLETE,
+            E_INVALID_STATUS
+        );
 
-        let Escrow {
-            id,
-            creator: _,
-            buyer,
-            seller,
-            price,
-            buyer_bond,
-            seller_bond: _,
-            buyer_required: _,
-            seller_required: _,
-            buyer_coin,
-            seller_coin,
-            buyer_deposited: _,
-            seller_deposited: _,
-            status: _,
-            note: _,
-        } = escrow;
+        assert!(
+            vector::length(&finalization_note) <= MAX_NOTE_LEN,
+            E_NOTE_TOO_LONG
+        );
 
-        let mut buyer_coin = option::destroy_some(buyer_coin);
-        let seller_coin = option::destroy_some(seller_coin);
+        let sender = tx_context::sender(ctx);
 
-        coin::join(&mut buyer_coin, seller_coin);
+        assert!(is_party(escrow, sender), E_UNAUTHORIZED);
 
-        let seller_gets = price + buyer_bond;
+        let total_locked =
+            checked_add(escrow.deposited_a, escrow.deposited_b);
 
-        let seller_payout = coin::split(&mut buyer_coin, seller_gets, ctx);
+        let payouts =
+            checked_add(payout_a, payout_b);
 
-        transfer::public_transfer(seller_payout, seller);
+        let total_payout =
+            checked_add(payouts, proposed_donation);
 
-        // remaining coin is seller bond, returned to buyer
-        transfer::public_transfer(buyer_coin, buyer);
+        assert!(
+            total_payout == total_locked,
+            E_INVALID_FINALIZATION
+        );
 
-        object::delete(id);
+        assert!(
+            proposed_donation <= escrow.reference_amount,
+            E_INVALID_DONATION
+        );
+
+        escrow.proposed_payout_a = payout_a;
+        escrow.proposed_payout_b = payout_b;
+        escrow.proposed_donation = proposed_donation;
+
+        escrow.finalization_proposer = option::some(sender);
+        escrow.finalization_note = finalization_note;
+
+        escrow.status = STATUS_FINALIZATION_SUGGESTED;
+
+        event::emit(FinalizationSuggested {
+            escrow_id: object::uid_to_inner(&escrow.id),
+            proposer: sender,
+            payout_a,
+            payout_b,
+            donation: proposed_donation,
+        });
     }
 
-    // Seller agrees to refund.
-    // Buyer receives everything.
-    public fun refund(
-        escrow: Escrow,
-        ctx: &mut TxContext
+    // ============================================================
+    // Reject finalization
+    // ============================================================
+
+    public fun reject_finalization(
+        escrow: &mut Escrow,
+        ctx: &TxContext,
     ) {
-        assert!(tx_context::sender(ctx) == escrow.seller, E_UNAUTHORIZED);
-        assert!(escrow.status == STATUS_FUNDED, E_NOT_FUNDED);
+        assert!(
+            escrow.status == STATUS_FINALIZATION_SUGGESTED,
+            E_INVALID_STATUS
+        );
 
-        let Escrow {
-            id,
-            creator: _,
-            buyer,
-            seller: _,
-            price: _,
-            buyer_bond: _,
-            seller_bond: _,
-            buyer_required: _,
-            seller_required: _,
-            buyer_coin,
-            seller_coin,
-            buyer_deposited: _,
-            seller_deposited: _,
-            status: _,
-            note: _,
-        } = escrow;
+        let sender = tx_context::sender(ctx);
 
-        let mut buyer_coin = option::destroy_some(buyer_coin);
-        let seller_coin = option::destroy_some(seller_coin);
+        assert!(is_party(escrow, sender), E_UNAUTHORIZED);
 
-        coin::join(&mut buyer_coin, seller_coin);
+        assert!(
+            option::is_some(&escrow.finalization_proposer),
+            E_INVALID_FINALIZATION
+        );
 
-        transfer::public_transfer(buyer_coin, buyer);
+        let proposer =
+            *option::borrow(&escrow.finalization_proposer);
 
-        object::delete(id);
+        assert!(
+            sender != proposer,
+            E_CANNOT_REJECT_OWN_FINALIZATION
+        );
+
+        escrow.proposed_payout_a = 0;
+        escrow.proposed_payout_b = 0;
+        escrow.proposed_donation = 0;
+
+        option::extract(&mut escrow.finalization_proposer);
+
+        escrow.finalization_note = vector[];
+
+        escrow.status = STATUS_DEPOSITS_COMPLETE;
+
+        event::emit(FinalizationRejected {
+            escrow_id: object::uid_to_inner(&escrow.id),
+            rejected_by: sender,
+        });
     }
 
-    // Creator can cancel only if nobody deposited yet.
-    public fun cancel_unfunded(
-        escrow: Escrow,
-        ctx: &TxContext
+    // ============================================================
+    // Accept finalization
+    //
+    // Donation recipient is protocol-controlled.
+    // The accepter cannot redirect the donation.
+    // ============================================================
+
+    public fun accept_finalization(
+        escrow: &mut Escrow,
+        clock: &Clock,
+        ctx: &mut TxContext,
     ) {
-        assert!(tx_context::sender(ctx) == escrow.creator, E_UNAUTHORIZED);
-        assert!(escrow.status == STATUS_CREATED, E_INVALID_STATUS);
-        assert!(!escrow.buyer_deposited, E_INVALID_STATUS);
-        assert!(!escrow.seller_deposited, E_INVALID_STATUS);
+        assert!(
+            escrow.status == STATUS_FINALIZATION_SUGGESTED,
+            E_INVALID_STATUS
+        );
 
-        let Escrow {
-            id,
-            creator: _,
-            buyer: _,
-            seller: _,
-            price: _,
-            buyer_bond: _,
-            seller_bond: _,
-            buyer_required: _,
-            seller_required: _,
-            buyer_coin,
-            seller_coin,
-            buyer_deposited: _,
-            seller_deposited: _,
-            status: _,
-            note: _,
-        } = escrow;
+        let sender = tx_context::sender(ctx);
 
-        option::destroy_none(buyer_coin);
-        option::destroy_none(seller_coin);
+        assert!(is_party(escrow, sender), E_UNAUTHORIZED);
 
-        object::delete(id);
+        assert!(
+            option::is_some(&escrow.finalization_proposer),
+            E_INVALID_FINALIZATION
+        );
+
+        let proposer =
+            *option::borrow(&escrow.finalization_proposer);
+
+        assert!(
+            sender != proposer,
+            E_CANNOT_ACCEPT_OWN_FINALIZATION
+        );
+
+        assert!(
+            option::is_some(&escrow.party_a) &&
+            option::is_some(&escrow.party_b),
+            E_INVALID_PARTY
+        );
+
+        let party_a = *option::borrow(&escrow.party_a);
+        let party_b = *option::borrow(&escrow.party_b);
+
+        let payout_a = escrow.proposed_payout_a;
+        let payout_b = escrow.proposed_payout_b;
+        let donation = escrow.proposed_donation;
+
+        let total_locked =
+            checked_add(escrow.deposited_a, escrow.deposited_b);
+
+        let total_payout =
+            checked_add(
+                checked_add(payout_a, payout_b),
+                donation
+            );
+
+        // Defense-in-depth.
+        assert!(
+            total_payout == total_locked,
+            E_INVALID_FINALIZATION
+        );
+
+        assert!(
+            balance::value(&escrow.vault) == total_locked,
+            E_INVALID_FINALIZATION
+        );
+
+        if (payout_a > 0) {
+            let payout_balance =
+                balance::split(&mut escrow.vault, payout_a);
+
+            let payout_coin =
+                coin::from_balance(payout_balance, ctx);
+
+            transfer::public_transfer(payout_coin, party_a);
+        };
+
+        if (payout_b > 0) {
+            let payout_balance =
+                balance::split(&mut escrow.vault, payout_b);
+
+            let payout_coin =
+                coin::from_balance(payout_balance, ctx);
+
+            transfer::public_transfer(payout_coin, party_b);
+        };
+
+        if (donation > 0) {
+            let donation_balance =
+                balance::split(&mut escrow.vault, donation);
+
+            let donation_coin =
+                coin::from_balance(donation_balance, ctx);
+
+            transfer::public_transfer(
+                donation_coin,
+                DONATION_RECIPIENT
+            );
+        };
+
+        assert!(
+            balance::value(&escrow.vault) == 0,
+            E_INVALID_FINALIZATION
+        );
+
+        escrow.status = STATUS_COMPLETED;
+        escrow.finalized_at = clock::timestamp_ms(clock);
+
+        event::emit(EscrowCompleted {
+            escrow_id: object::uid_to_inner(&escrow.id),
+            accepted_by: sender,
+            payout_a,
+            payout_b,
+            donation,
+            timestamp_ms: escrow.finalized_at,
+        });
+    }
+
+    // ============================================================
+    // Helpers
+    // ============================================================
+
+    fun is_party(
+        escrow: &Escrow,
+        addr: address,
+    ): bool {
+        let is_a =
+            option::is_some(&escrow.party_a) &&
+            *option::borrow(&escrow.party_a) == addr;
+
+        let is_b =
+            option::is_some(&escrow.party_b) &&
+            *option::borrow(&escrow.party_b) == addr;
+
+        is_a || is_b
+    }
+
+    fun checked_add(a: u64, b: u64): u64 {
+        assert!(a <= 18446744073709551615 - b, E_ARITHMETIC_OVERFLOW);
+        a + b
+    }
+
+    // ============================================================
+    // Read-only getters
+    // ============================================================
+
+    public fun creator(escrow: &Escrow): address {
+        escrow.creator
+    }
+
+    public fun escrow_type(escrow: &Escrow): u8 {
+        escrow.escrow_type
+    }
+
+    public fun status(escrow: &Escrow): u8 {
+        escrow.status
+    }
+
+    public fun reference_amount(escrow: &Escrow): u64 {
+        escrow.reference_amount
+    }
+
+    public fun required_deposit_a(escrow: &Escrow): u64 {
+        escrow.required_deposit_a
+    }
+
+    public fun required_deposit_b(escrow: &Escrow): u64 {
+        escrow.required_deposit_b
+    }
+
+    public fun deposited_a(escrow: &Escrow): u64 {
+        escrow.deposited_a
+    }
+
+    public fun deposited_b(escrow: &Escrow): u64 {
+        escrow.deposited_b
+    }
+
+    public fun vault_balance(escrow: &Escrow): u64 {
+        balance::value(&escrow.vault)
+    }
+
+    public fun created_at(escrow: &Escrow): u64 {
+        escrow.created_at
+    }
+
+    public fun deposit_at(escrow: &Escrow): u64 {
+        escrow.deposit_at
+    }
+
+    public fun finalized_at(escrow: &Escrow): u64 {
+        escrow.finalized_at
     }
 }

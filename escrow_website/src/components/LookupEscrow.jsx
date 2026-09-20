@@ -8,31 +8,32 @@ function LookupEscrow() {
   const [escrow, setEscrow] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const handleLookup = async () => {
-
+  const handleLookup = async (
+    id = escrowId
+  ) => {
     try {
-
       setLoading(true);
-
-      const result = await client.getObject({
-        id: escrowId.trim(),
-        options: {
-          showContent: true,
-          showOwner: true,
-        },
-      });
-
+  
+      const lookupId =
+        typeof id === "string"
+          ? id.trim()
+          : escrowId.trim();
+  
+      const result =
+        await client.getObject({
+          id: lookupId,
+          options: {
+            showContent: true,
+            showOwner: true,
+          },
+        });
+  
       setEscrow(result);
-
     } catch (err) {
-
       console.error(err);
       alert("Escrow not found");
-
     } finally {
-
       setLoading(false);
-
     }
   };
 
@@ -63,7 +64,12 @@ function LookupEscrow() {
 
       {escrow && (
         <div className="mt-6">
-          <EscrowCard escrow={escrow} />
+          <EscrowCard
+            escrow={escrow}
+            onRefresh={() =>
+              handleLookup(escrow.data.objectId)
+            }
+          />
         </div>
       )}
 
