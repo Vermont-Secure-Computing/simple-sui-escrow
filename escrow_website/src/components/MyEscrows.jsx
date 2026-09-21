@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { useWallet } from "@suiet/wallet-kit";
+import { useEscrowWallet } from "../lib/useEscrowWallet.js";
 
 import { client } from "../lib/sui";
 import EscrowCard from "./EscrowCard";
 
 function MyEscrows() {
 
-  const wallet = useWallet();
+  const wallet = useEscrowWallet();
 
   const [escrows, setEscrows] = useState([]);
   const [loading, setLoading] = useState(false);

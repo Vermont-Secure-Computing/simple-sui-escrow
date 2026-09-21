@@ -1,15 +1,12 @@
 import "./App.css";
 
-import { ConnectButton } from "@suiet/wallet-kit";
+import { ConnectButton } from "@mysten/dapp-kit-react/ui";
 
 import CreateEscrow from "./components/CreateEscrow";
 import LookupEscrow from "./components/LookupEscrow";
-import MyEscrows from "./components/MyEscrows";
 
 function App() {
-
   return (
-
     <div className="min-h-screen bg-slate-950 p-10">
 
       <div className="mb-6">
@@ -17,13 +14,8 @@ function App() {
       </div>
 
       <div className="grid gap-6">
-
         <CreateEscrow />
-
         <LookupEscrow />
-
-        <MyEscrows />
-
       </div>
 
     </div>

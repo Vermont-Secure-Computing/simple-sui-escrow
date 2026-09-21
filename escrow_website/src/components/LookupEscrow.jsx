@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { client } from "../lib/sui";
 import EscrowCard from "./EscrowCard";
+import { decodeEscrow } from "../lib/escrowBcs.js";
 
 function LookupEscrow() {
 
@@ -19,16 +20,41 @@ function LookupEscrow() {
           ? id.trim()
           : escrowId.trim();
   
-      const result =
-        await client.getObject({
-          id: lookupId,
-          options: {
-            showContent: true,
-            showOwner: true,
-          },
-        });
-  
-      setEscrow(result);
+          const result =
+          await client.getObject({
+            objectId: lookupId,
+            include: {
+              content: true,
+              previousTransaction: true,
+            },
+          });
+        
+          console.log(
+            "=== GRPC ESCROW OBJECT ===",
+            result
+          );
+          
+          const decoded = decodeEscrow(
+            result.object.content
+          );
+          
+          console.log(
+            "=== DECODED ESCROW ===",
+            decoded
+          );
+          
+          setEscrow({
+            data: {
+              objectId: result.object.objectId,
+              content: {
+                fields: decoded,
+              },
+              owner: result.object.owner,
+              type: result.object.type,
+              version: result.object.version,
+              digest: result.object.digest,
+            },
+          });
     } catch (err) {
       console.error(err);
       alert("Escrow not found");

@@ -2,33 +2,39 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import {
-  WalletProvider,
-} from "@suiet/wallet-kit";
+  createDAppKit,
+  DAppKitProvider,
+} from "@mysten/dapp-kit-react";
 
-import "@suiet/wallet-kit/style.css";
+import { SuiGrpcClient } from "@mysten/sui/grpc";
 
 import App from "./App.jsx";
 import "./index.css";
 
-const SuiLocalnetChain = {
-  id: "sui:localnet",
-  name: "Sui Localnet",
-  rpcUrl: "http://127.0.0.1:9000",
+const GRPC_URLS = {
+  devnet: "https://fullnode.devnet.sui.io:443",
 };
 
-const chains = [
-  SuiLocalnetChain,
-];
+export const dAppKit = createDAppKit({
+  networks: ["devnet"],
+  defaultNetwork: "devnet",
+
+  createClient(network) {
+    return new SuiGrpcClient({
+      network,
+      baseUrl: GRPC_URLS[network],
+    });
+  },
+
+  autoConnect: true,
+});
 
 ReactDOM.createRoot(
   document.getElementById("root")
 ).render(
   <React.StrictMode>
-    <WalletProvider
-      chains={chains}
-      autoConnect={false}
-    >
+    <DAppKitProvider dAppKit={dAppKit}>
       <App />
-    </WalletProvider>
+    </DAppKitProvider>
   </React.StrictMode>
 );

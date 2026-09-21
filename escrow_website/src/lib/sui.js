@@ -1,20 +1,21 @@
-import { SuiClient } from "@mysten/sui/client";
+import { SuiGrpcClient } from "@mysten/sui/grpc";
 import { Transaction } from "@mysten/sui/transactions";
 
 // ============================================================
 // NETWORK / CONTRACT
 // ============================================================
 
-export const NETWORK = "localnet";
+export const NETWORK = "devnet";
 
-export const RPC_URL = "http://127.0.0.1:9000";
+export const RPC_URL = "https://fullnode.devnet.sui.io:443";
 
-export const client = new SuiClient({
-  url: RPC_URL,
+export const client = new SuiGrpcClient({
+  network: NETWORK,
+  baseUrl: RPC_URL,
 });
 
 export const PACKAGE_ID =
-  "0x24f913383295f9598079d392794a5554c9bee9023db04260d8836f576d5f8cb5";
+  "0x410912da4463d4abc2786fbb7ef1395d28e3e4b4f70c08bb040cb2e2b0af0d4e";
 
 export const CLOCK_OBJECT_ID = "0x6";
 
@@ -85,6 +86,11 @@ export async function depositEscrow({
     ],
   });
 
+  console.log(
+    "=== DEPOSIT TX JSON ===",
+    await tx.toJSON()
+  );
+
   const result =
     await wallet.signAndExecuteTransaction({
       transaction: tx,
@@ -96,25 +102,31 @@ export async function depositEscrow({
     );
   }
 
-  const txResult =
-    await client.waitForTransaction({
-      digest: result.digest,
-      options: {
-        showEffects: true,
-        showObjectChanges: true,
-        showEvents: true,
-      },
-    });
+  const confirmed =
+  await client.waitForTransaction({
+    digest: result.digest,
+    include: {
+      effects: true,
+      events: true,
+      objectTypes: true,
+    },
+  });
 
-  if (
-    txResult.effects?.status?.status !==
-    "success"
-  ) {
-    throw new Error(
-      txResult.effects?.status?.error ||
-        "Deposit transaction failed."
-    );
-  }
+console.log(
+  "=== DEPOSIT CONFIRMED ===",
+  confirmed
+);
+
+const txResult =
+  confirmed.Transaction ?? confirmed;
+
+if (!txResult.status?.success) {
+  throw new Error(
+    txResult.status?.error?.message ??
+      txResult.status?.error ??
+      "Deposit transaction failed."
+  );
+}
 
   return {
     digest: result.digest,
@@ -182,25 +194,31 @@ async function executeEscrowTransaction({
     );
   }
 
-  const txResult =
-    await client.waitForTransaction({
-      digest: result.digest,
-      options: {
-        showEffects: true,
-        showObjectChanges: true,
-        showEvents: true,
-      },
-    });
+  const confirmed =
+  await client.waitForTransaction({
+    digest: result.digest,
+    include: {
+      effects: true,
+      events: true,
+      objectTypes: true,
+    },
+  });
 
-  if (
-    txResult.effects?.status?.status !==
-    "success"
-  ) {
-    throw new Error(
-      txResult.effects?.status?.error ||
-        errorMessage
-    );
-  }
+console.log(
+  "=== ESCROW TRANSACTION CONFIRMED ===",
+  confirmed
+);
+
+const txResult =
+  confirmed.Transaction ?? confirmed;
+
+if (!txResult.status?.success) {
+  throw new Error(
+    txResult.status?.error?.message ??
+      txResult.status?.error ??
+      errorMessage
+  );
+}
 
   return {
     digest: result.digest,
@@ -432,37 +450,57 @@ export async function createEscrow({
     throw new Error("Wallet did not return a transaction digest.");
   }
 
-  // Fetch the full transaction from Devnet.
+  // Wait until the transaction is indexed on Devnet.
   const txResult = await client.waitForTransaction({
     digest: result.digest,
-    options: {
-      showEffects: true,
-      showObjectChanges: true,
-      showEvents: true,
+    include: {
+      effects: true,
+      events: true,
+      objectTypes: true,
     },
   });
 
-  console.log("Confirmed transaction:", txResult);
+  console.log(
+    "=== CONFIRMED GRPC TRANSACTION ===",
+    txResult
+  );
 
-  if (txResult.effects?.status?.status !== "success") {
+  const confirmed =
+    txResult.Transaction ??
+    txResult.FailedTransaction;
+
+  console.log(
+    "=== CONFIRMED TRANSACTION DATA ===",
+    confirmed
+  );
+
+  console.log(
+    "=== TRANSACTION EFFECTS ===",
+    confirmed?.effects
+  );
+
+  if (!confirmed?.status?.success) {
     throw new Error(
-      txResult.effects?.status?.error ||
+      confirmed?.status?.error?.message ||
         "Create escrow transaction failed."
     );
   }
 
-  // Find the newly created shared Escrow object.
-  const createdEscrow = txResult.objectChanges?.find(
-    (change) =>
-      change.type === "created" &&
-      change.objectType ===
-        `${PACKAGE_ID}::escrow::Escrow`
-  );
+  // Find the Escrow object returned by the gRPC transaction.
+  const escrowObjectType =
+    `${PACKAGE_ID}::escrow::Escrow`;
 
-  if (!createdEscrow?.objectId) {
+  const escrowObjectId =
+    Object.entries(confirmed.objectTypes ?? {})
+      .find(
+        ([, objectType]) =>
+          objectType === escrowObjectType
+      )?.[0];
+
+  if (!escrowObjectId) {
     console.error(
-      "Object changes:",
-      txResult.objectChanges
+      "Object types:",
+      confirmed.objectTypes
     );
 
     throw new Error(
@@ -472,12 +510,12 @@ export async function createEscrow({
 
   console.log(
     "Created Escrow:",
-    createdEscrow.objectId
+    escrowObjectId
   );
 
   return {
     digest: result.digest,
-    escrowObjectId: createdEscrow.objectId,
+    escrowObjectId,
   };
   
 }

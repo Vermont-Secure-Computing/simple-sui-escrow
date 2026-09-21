@@ -7,8 +7,6 @@ import {
 import logo from "../assets/logo.png";
 import { client } from "../lib/sui.js";
 
-const wallet = useWallet();
-
 export default function Header() {
   const wallet = useWallet();
 
@@ -25,11 +23,11 @@ export default function Header() {
   
         console.log("=== DIRECT DEVNET BALANCE ===");
         console.log("address:", wallet.account.address);
-        console.log("coinType:", result.coinType);
-        console.log("totalBalance:", result.totalBalance);
+        console.log("coinType:", result.balance.coinType);
+        console.log("balance:", result.balance.balance);
         console.log(
           "SUI:",
-          Number(result.totalBalance) / 1_000_000_000
+          Number(result.balance.balance) / 1_000_000_000
         );
       } catch (error) {
         console.error(

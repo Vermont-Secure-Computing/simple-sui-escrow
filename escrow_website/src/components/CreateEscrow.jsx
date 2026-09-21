@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useWallet } from "@suiet/wallet-kit";
+import { useEscrowWallet } from "../lib/useEscrowWallet.js";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBagShopping,
@@ -12,7 +12,7 @@ function toMist(sui) {
   }
 
 function CreateEscrow() {
-  const wallet = useWallet();
+  const wallet = useEscrowWallet();
 
   const [mode, setMode] = useState(null); // "buying" | "selling"
   const [template, setTemplate] = useState("payment");

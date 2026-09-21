@@ -13,8 +13,8 @@
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
     "@fortawesome/free-solid-svg-icons": "^7.2.0",
     "@fortawesome/react-fontawesome": "^3.3.1",
-    "@mysten/sui": "^1.28.2",
-    "@suiet/wallet-kit": "^0.5.1",
+    "@mysten/dapp-kit-react": "^2.1.32",
+    "@mysten/sui": "^2.31.3",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
