@@ -15,7 +15,7 @@ export const client = new SuiGrpcClient({
 });
 
 export const PACKAGE_ID =
-  "0x410912da4463d4abc2786fbb7ef1395d28e3e4b4f70c08bb040cb2e2b0af0d4e";
+  "0x8aa8309f983c45583c3326ec76845970c48566c12af0eb9fdb5b3d63a2c4dd5c";
 
 export const CLOCK_OBJECT_ID = "0x6";
 

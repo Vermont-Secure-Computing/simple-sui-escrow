@@ -1,64 +1,31 @@
-import React, { useEffect } from "react";
-import {
-  ConnectButton,
-  useWallet,
-} from "@suiet/wallet-kit";
-
-import logo from "../assets/logo.png";
-import { client } from "../lib/sui.js";
+import React from "react";
+import { Link, useLocation } from "react-router-dom";
+import { ConnectButton } from "@mysten/dapp-kit-react/ui";
 
 export default function Header() {
-  const wallet = useWallet();
+  const location = useLocation();
 
-  useEffect(() => {
-    if (!wallet.account?.address) {
-      return;
-    }
-  
-    const checkBalance = async () => {
-      try {
-        const result = await client.getBalance({
-          owner: wallet.account.address,
-        });
-  
-        console.log("=== DIRECT DEVNET BALANCE ===");
-        console.log("address:", wallet.account.address);
-        console.log("coinType:", result.balance.coinType);
-        console.log("balance:", result.balance.balance);
-        console.log(
-          "SUI:",
-          Number(result.balance.balance) / 1_000_000_000
-        );
-      } catch (error) {
-        console.error(
-          "Direct Devnet balance failed:",
-          error
-        );
-      }
-    };
-  
-    checkBalance();
-  }, [wallet.account?.address]);
-
-  console.log("=== SUIET DEBUG ===");
-  console.log("connected:", wallet.connected);
-  console.log("address:", wallet.account?.address);
-  console.log("account chains:", wallet.account?.chains);
-  console.log("wallet chain:", wallet.chain);
-  console.log("wallet name:", wallet.name);
-  console.log("adapter:", wallet.adapter);
+  const isEscrowPage = location.pathname.startsWith("/escrow");
 
   return (
-    <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6">
-
-        <div className="flex min-w-0 items-start gap-3">
-          <img
-            src={logo}
-            alt="SSScrow"
-            className="h-9 w-auto shrink-0 object-contain sm:h-10"
-          />
-
+    <header
+      className={
+        isEscrowPage
+          ? "border-b border-white/10 bg-slate-900/80 backdrop-blur"
+          : "border-b border-slate-700"
+      }
+    >
+      <div
+        className={
+          isEscrowPage
+            ? "mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6"
+            : "mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-6 sm:px-6"
+        }
+      >
+        <Link
+          to="/"
+          className="flex min-w-0 items-center gap-3 rounded-xl transition hover:opacity-80"
+        >
           <div className="min-w-0 text-left leading-tight">
             <span className="block truncate text-lg font-bold text-white sm:text-2xl">
               ssscrow
@@ -68,12 +35,20 @@ export default function Header() {
               Simple Sui Escrow
             </span>
           </div>
-        </div>
+        </Link>
 
-        <div className="shrink-0">
-          <ConnectButton />
-        </div>
-
+        {isEscrowPage ? (
+          <div className="shrink-0">
+            <ConnectButton />
+          </div>
+        ) : (
+          <Link
+            to="/escrow"
+            className="rounded-full border border-cyan-500/20 bg-black px-5 py-2 text-sm font-medium text-white transition hover:border-cyan-400/40 hover:bg-cyan-500/10"
+          >
+            Open App
+          </Link>
+        )}
       </div>
     </header>
   );

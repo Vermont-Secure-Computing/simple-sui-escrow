@@ -1,24 +1,27 @@
-import "./App.css";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+} from "react-router-dom";
 
-import { ConnectButton } from "@mysten/dapp-kit-react/ui";
-
-import CreateEscrow from "./components/CreateEscrow";
-import LookupEscrow from "./components/LookupEscrow";
+import { LandingPage } from "./components/LandingPage";
+import EscrowHome from "./components/EscrowHome";
 
 function App() {
   return (
-    <div className="min-h-screen bg-slate-950 p-10">
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/"
+          element={<LandingPage />}
+        />
 
-      <div className="mb-6">
-        <ConnectButton />
-      </div>
-
-      <div className="grid gap-6">
-        <CreateEscrow />
-        <LookupEscrow />
-      </div>
-
-    </div>
+        <Route
+          path="/escrow"
+          element={<EscrowHome />}
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

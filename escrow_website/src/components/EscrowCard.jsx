@@ -51,6 +51,9 @@ function EscrowCard({ escrow, onRefresh }) {
   const [finalizationResult, setFinalizationResult] =
     useState(null);
 
+  const [finalizationMessage, setFinalizationMessage] =
+    useState("");
+
   const [responding, setResponding] =
     useState(false);
 
@@ -251,7 +254,7 @@ function EscrowCard({ escrow, onRefresh }) {
           payoutA,
           payoutB,
           proposedDonation,
-          note: "Payment completed",
+          note: finalizationMessage.trim(),
         });
 
       setFinalizationResult(
@@ -544,18 +547,44 @@ function EscrowCard({ escrow, onRefresh }) {
         </div>
       )}
 
-      {status === 1 &&
-        (isPartyA || isPartyB) && (
-          <button
-            onClick={handleSuggestFinalization}
-            disabled={finalizing}
-            className="mt-5 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50"
-          >
-            {finalizing
-              ? "Suggesting Finalization..."
-              : "Suggest Finalization"}
-          </button>
-        )}
+{status === 1 &&
+  (isPartyA || isPartyB) && (
+    <div className="mt-5 rounded-xl border border-slate-700 bg-slate-900 p-4">
+      <p className="font-bold text-white">
+        Suggest Finalization
+      </p>
+
+      <p className="mt-1 text-sm text-slate-400">
+        Add an optional message for the other party.
+      </p>
+
+      <textarea
+        value={finalizationMessage}
+        onChange={(e) =>
+          setFinalizationMessage(e.target.value)
+        }
+        placeholder="Optional finalization note"
+        rows={3}
+        maxLength={200}
+        disabled={finalizing}
+        className="mt-4 w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-blue-500 disabled:opacity-50"
+      />
+
+      <div className="mt-1 text-right text-xs text-slate-500">
+        {finalizationMessage.length}/200
+      </div>
+
+      <button
+        onClick={handleSuggestFinalization}
+        disabled={finalizing}
+        className="mt-3 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50"
+      >
+        {finalizing
+          ? "Suggesting Finalization..."
+          : "Suggest Finalization"}
+      </button>
+    </div>
+  )}
 
       {finalizationResult && (
         <div className="mt-4 rounded-xl border border-blue-500/30 bg-blue-500/10 p-3">
@@ -627,14 +656,14 @@ function EscrowCard({ escrow, onRefresh }) {
           )}
 
           {canRespondToFinalization && (
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
 
               <button
                 onClick={
                   handleAcceptFinalization
                 }
                 disabled={responding}
-                className="rounded-xl bg-green-600 px-5 py-3 font-bold text-white disabled:opacity-50"
+                className="w-full rounded-xl bg-green-600 px-5 py-3 text-center font-bold text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {responding
                   ? "Processing..."
@@ -646,7 +675,7 @@ function EscrowCard({ escrow, onRefresh }) {
                   handleRejectFinalization
                 }
                 disabled={responding}
-                className="rounded-xl bg-red-600 px-5 py-3 font-bold text-white disabled:opacity-50"
+                className="w-full rounded-xl bg-red-600 px-5 py-3 text-center font-bold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {responding
                   ? "Processing..."

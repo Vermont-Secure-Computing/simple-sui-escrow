@@ -187,6 +187,28 @@ function CreateEscrow() {
 
       {mode && (
         <div className="mt-6 grid gap-4">
+          <div>
+              <label className="mb-2 block text-sm font-medium text-slate-200">
+                {mode === "buying"
+                  ? "Seller Wallet Address"
+                  : "Buyer Wallet Address"}
+              </label>
+
+              <input
+                value={counterparty}
+                onChange={(e) =>
+                  setCounterparty(e.target.value)
+                }
+                placeholder="Optional — leave blank to let the other party join later"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white placeholder:text-slate-500"
+              />
+
+              <p className="mt-1 text-xs text-slate-500">
+                Optional. If left blank, the other party can
+                claim the open role when they make the required
+                deposit.
+              </p>
+            </div>
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-200">
