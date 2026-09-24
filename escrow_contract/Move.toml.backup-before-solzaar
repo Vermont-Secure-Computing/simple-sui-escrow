@@ -1,0 +1,18 @@
+[package]
+name = "simple_sui_escrow"
+edition = "2024"         # edition = "legacy" to use legacy (pre-2024) Move
+# license = ""           # e.g., "MIT", "GPL", "Apache 2.0"
+# authors = ["Robert Gludo, Luke Saul, Jong Gludo"]      # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
+
+[dependencies]
+
+
+[addresses]
+escrow = "0x0"
+
+[environments]
+devnet = "72237c15"
+
+# Read more about the package management system options:
+# https://docs.sui.io/guides/developer/sui-101/move-package-management
+

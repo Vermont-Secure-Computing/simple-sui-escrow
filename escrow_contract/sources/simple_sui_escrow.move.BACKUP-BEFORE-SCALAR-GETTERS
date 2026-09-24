@@ -667,24 +667,6 @@ module escrow::escrow {
         escrow.deposited_b
     }
 
-    public fun proposed_payout_a(
-        escrow: &Escrow,
-    ): u64 {
-        escrow.proposed_payout_a
-    }
-
-    public fun proposed_payout_b(
-        escrow: &Escrow,
-    ): u64 {
-        escrow.proposed_payout_b
-    }
-
-    public fun proposed_donation(
-        escrow: &Escrow,
-    ): u64 {
-        escrow.proposed_donation
-    }
-
     public fun vault_balance(escrow: &Escrow): u64 {
         balance::value(&escrow.vault)
     }
@@ -707,24 +689,6 @@ module escrow::escrow {
 
     public fun party_b(escrow: &Escrow): &Option<address> {
         &escrow.party_b
-    }
-
-    // Scalar getters for cross-package callers.
-    // These avoid returning &Option<address> across a package boundary.
-    public fun party_a_address(escrow: &Escrow): address {
-        assert!(
-            option::is_some(&escrow.party_a),
-            E_INVALID_PARTY
-        );
-        *option::borrow(&escrow.party_a)
-    }
-
-    public fun party_b_address(escrow: &Escrow): address {
-        assert!(
-            option::is_some(&escrow.party_b),
-            E_INVALID_PARTY
-        );
-        *option::borrow(&escrow.party_b)
     }
 
     public fun note(escrow: &Escrow): &vector<u8> {
