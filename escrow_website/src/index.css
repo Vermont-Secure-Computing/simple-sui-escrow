@@ -110,3 +110,306 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* =========================
+   WALLET BUTTON
+========================= */
+
+.wallet-wrapper {
+  position: relative;
+}
+
+.wallet-connect-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 10px 16px;
+
+  border: 1px solid #3b82f6;
+  border-radius: 10px;
+
+  background: #111827;
+  color: white;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.wallet-connect-button:hover {
+  background: #1f2937;
+}
+
+.wallet-connected-name {
+  color: #60a5fa;
+}
+
+.wallet-arrow {
+  opacity: 0.7;
+}
+
+
+/* =========================
+   ACCOUNT MENU
+========================= */
+
+.wallet-account-menu {
+  position: absolute;
+
+  right: 0;
+  top: calc(100% + 8px);
+
+  width: 190px;
+
+  background: #111827;
+
+  border: 1px solid #374151;
+  border-radius: 12px;
+
+  padding: 8px;
+
+  z-index: 1000;
+
+  box-shadow:
+    0 15px 40px rgba(0, 0, 0, 0.35);
+}
+
+.wallet-account-address {
+  padding: 10px;
+
+  color: #9ca3af;
+
+  font-size: 13px;
+}
+
+.wallet-account-menu button {
+  width: 100%;
+
+  padding: 10px;
+
+  border: none;
+  border-radius: 8px;
+
+  background: transparent;
+  color: white;
+
+  text-align: left;
+
+  cursor: pointer;
+}
+
+.wallet-account-menu button:hover {
+  background: #1f2937;
+}
+
+.wallet-account-menu .wallet-disconnect {
+  color: #f87171;
+}
+
+
+/* =========================
+   WALLET MODAL
+========================= */
+
+.wallet-modal-overlay {
+  position: fixed;
+
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  background: rgba(0, 0, 0, 0.65);
+
+  backdrop-filter: blur(4px);
+
+  z-index: 9999;
+}
+
+.wallet-modal {
+  width: 100%;
+  max-width: 430px;
+
+  background: #0f172a;
+
+  border: 1px solid #334155;
+  border-radius: 18px;
+
+  padding: 22px;
+
+  color: white;
+
+  box-shadow:
+    0 25px 70px rgba(0, 0, 0, 0.5);
+}
+
+.wallet-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+
+  margin-bottom: 20px;
+}
+
+.wallet-modal-header h2 {
+  margin: 0;
+
+  font-size: 21px;
+}
+
+.wallet-modal-header p {
+  margin: 5px 0 0;
+
+  color: #94a3b8;
+
+  font-size: 13px;
+}
+
+.wallet-close {
+  border: none;
+  background: transparent;
+
+  color: #94a3b8;
+
+  font-size: 28px;
+
+  cursor: pointer;
+}
+
+.wallet-close:hover {
+  color: white;
+}
+
+
+/* =========================
+   WALLET LIST
+========================= */
+
+.wallet-list {
+  display: flex;
+  flex-direction: column;
+
+  gap: 8px;
+
+  max-height: 360px;
+
+  overflow-y: auto;
+}
+
+.wallet-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  width: 100%;
+
+  padding: 12px;
+
+  border: 1px solid #273449;
+  border-radius: 12px;
+
+  background: #111827;
+  color: white;
+
+  cursor: pointer;
+
+  transition: 0.15s;
+}
+
+.wallet-item:hover:not(:disabled) {
+  background: #1e293b;
+
+  border-color: #3b82f6;
+
+  transform: translateY(-1px);
+}
+
+.wallet-item:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+}
+
+.wallet-info {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  font-weight: 600;
+}
+
+.wallet-icon {
+  width: 34px;
+  height: 34px;
+
+  border-radius: 9px;
+}
+
+.wallet-icon-placeholder {
+  width: 34px;
+  height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+
+  background: #2563eb;
+
+  font-weight: 700;
+}
+
+.wallet-item-action {
+  color: #60a5fa;
+
+  font-size: 13px;
+}
+
+.wallet-empty {
+  padding: 25px;
+
+  text-align: center;
+
+  color: #94a3b8;
+
+  border: 1px dashed #334155;
+  border-radius: 12px;
+}
+
+.wallet-error {
+  margin-top: 12px;
+
+  padding: 10px;
+
+  background: rgba(239, 68, 68, 0.1);
+
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 8px;
+
+  color: #f87171;
+
+  font-size: 13px;
+}
+
+.wallet-modal-footer {
+  margin-top: 18px;
+
+  padding-top: 15px;
+
+  border-top: 1px solid #273449;
+
+  color: #64748b;
+
+  font-size: 12px;
+
+  text-align: center;
+}

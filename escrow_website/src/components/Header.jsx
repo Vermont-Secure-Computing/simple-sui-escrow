@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ConnectButton } from "@mysten/dapp-kit-react/ui";
+import WalletButton from "./WalletButton";
 
 export default function Header() {
   const location = useLocation();
@@ -39,7 +39,7 @@ export default function Header() {
 
         {isEscrowPage ? (
           <div className="shrink-0">
-            <ConnectButton />
+            <WalletButton />
           </div>
         ) : (
           <Link
