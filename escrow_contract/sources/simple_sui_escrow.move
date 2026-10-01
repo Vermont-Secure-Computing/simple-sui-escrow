@@ -41,7 +41,7 @@ module escrow::escrow {
     const E_ARITHMETIC_OVERFLOW: u64 = 12;
 
     const MAX_NOTE_LEN: u64 = 200;
-    const DONATION_RECIPIENT: address = @0xD;
+    const DONATION_RECIPIENT: address = @0x516ec0b66f3174da736236c22d6d8db79d006c51518302316fa38876ed3afcb0;
 
     // ============================================================
     // Escrow

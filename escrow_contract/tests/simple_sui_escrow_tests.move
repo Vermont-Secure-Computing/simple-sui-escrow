@@ -1276,7 +1276,7 @@ fun test_proposer_cannot_accept() {
 fun test_other_party_accepts_and_payouts() {
     let party_a = @0xA;
     let party_b = @0xB;
-    let donation_recipient = @0xD;
+    let donation_recipient = @0x516ec0b66f3174da736236c22d6d8db79d006c51518302316fa38876ed3afcb0;
 
     let mut scenario = test_scenario::begin(party_a);
 
@@ -4901,7 +4901,7 @@ fun test_unauthorized_accept_finalization() {
 fun test_open_party_full_lifecycle() {
     let party_a = @0xA;
     let party_b = @0xB;
-    let donation_recipient = @0xD;
+    let donation_recipient = @0x516ec0b66f3174da736236c22d6d8db79d006c51518302316fa38876ed3afcb0;
 
     let mut scenario = test_scenario::begin(party_a);
 
@@ -5068,7 +5068,7 @@ fun test_open_party_full_lifecycle() {
 fun test_escrow_type_persists_through_completion() {
     let party_a = @0xA;
     let party_b = @0xB;
-    let donation_recipient = @0xD;
+    let donation_recipient = @0x516ec0b66f3174da736236c22d6d8db79d006c51518302316fa38876ed3afcb0;
 
     let mut scenario = test_scenario::begin(party_a);
 
@@ -5230,7 +5230,7 @@ fun test_escrow_type_persists_through_completion() {
 fun test_deposit_accounting_preserved_after_completion() {
     let party_a = @0xA;
     let party_b = @0xB;
-    let donation_recipient = @0xD;
+    let donation_recipient = @0x516ec0b66f3174da736236c22d6d8db79d006c51518302316fa38876ed3afcb0;
 
     let mut scenario = test_scenario::begin(party_a);
 
@@ -5612,7 +5612,7 @@ fun test_cancelled_terminal_accounting() {
 fun test_finalized_timestamp_written_on_acceptance() {
     let party_a = @0xA;
     let party_b = @0xB;
-    let donation_recipient = @0xD;
+    let donation_recipient = @0x516ec0b66f3174da736236c22d6d8db79d006c51518302316fa38876ed3afcb0;
 
     let mut scenario = test_scenario::begin(party_a);
 
